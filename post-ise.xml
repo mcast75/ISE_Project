@@ -3,9 +3,9 @@
 <customFields>
 </customFields>
 <guestAccessInfo>
-<fromDate>03/10/2017 12:00</fromDate>
+<fromDate>03/14/2017 12:00</fromDate>
 <location>San Jose</location>
-<toDate>03/12/2017 12:00</toDate>
+<toDate>03/19/2017 12:00</toDate>
 <validDays>1</validDays>
 </guestAccessInfo>
 <guestInfo>
@@ -16,7 +16,7 @@
 <notificationLanguage>English</notificationLanguage>
 <phoneNumber>5556667789</phoneNumber>
 <smsServiceProvider>Global Default</smsServiceProvider>
-<userName>guestuser_3_10</userName>
+<userName>pythonGuest</userName>
 </guestInfo>
 <guestType>Daily (default)</guestType>
 <personBeingVisited>micastel@cisco.com</personBeingVisited>
