@@ -1,6 +1,8 @@
-import requests, time, sys
-import datetime
+import requests, time, sys, platform, datetime
 from lxml import etree
+from reportlab.lib.pagesizes import letter
+from reportlab.pdfgen import canvas
+from subprocess import call
 
 class ISE_Print:
 	#Disable warnings???
@@ -15,9 +17,29 @@ class ISE_Print:
 			if str(tme)[18] == '9' and (str(tme)[20:23]) >= '999':
 				#print "hit [datetime]:\t"+str(tme)
 				#print "hit [convtime]:\t"+str(get_convert_time(tme))
-				ret_str = str(self.get_convert_time(tme))[:15]
+				#ret_str = str(get_convert_time(self, tme))[:15]
 				time.sleep(.2)
-				return ret_str
+				return tme
+
+	def wipe_guest(self, user, pwd, ip):
+		print "Wiping Guest Database..."
+		id_list=[]
+		url = "https://"+ip+":9060/ers/config/guestuser/"
+		headers={
+			'Accept': "application/vnd.com.cisco.ise.identity.guestuser.2.0+xml",
+			'Content-Type': 'application/vnd.com.cisco.ise.identity.guestuser.2.0+xml'
+		}
+		response = requests.request("GET", url, auth=(user,pwd), headers=headers, verify=False)
+		root = etree.fromstring(str(response.text))
+		for count in range (0, int(root.attrib['total'])):
+			id_list.append(str(root[0][count].attrib['id']))
+		for resource in id_list:
+			url = "https://"+ip+":9060/ers/config/guestuser/"+resource
+			headers={
+				'Accept': "application/vnd.com.cisco.ise.identity.guestuser.2.0+xml",
+				'Content-Type': 'application/vnd.com.cisco.ise.identity.guestuser.2.0+xml'
+			}
+			requests.request("DELETE", url, auth=(user,pwd), headers=headers, verify=False)
 
 	def get_convert_time(self, datetime):
 		abbrv = {'01':'jan', '02':'feb', '03':'mar', '04':'apr', '05':'may', '06':'jun', '07':'jul', '08':'aug', '09':'sep', '10':'oct', '11':'nov', '12':'dec'}
@@ -37,7 +59,7 @@ class ISE_Print:
 			hh = str((int(time_s[11:13])+4)%12)
 		mm = time_s[14:16]
 		ss = time_s[17:19]
-		new_time= day+dash+abbrv[month]+dash+year+space+hh+dot+mm+dot+ss
+		new_time= day+dash+abbrv[month]+dash+year+space+hh+dot+mm#+dot+ss
 
 		return new_time
 
@@ -53,17 +75,19 @@ class ISE_Print:
 		root = etree.fromstring(str(response.text))
 		if int(root.attrib['total'])!= 0:
 			print "Response:"
-			print etree.tostring(root, pretty_print=True)
+			#print etree.tostring(root, pretty_print=True)
 			print '\n'
 		print
 		print "Number of recent : "+ str(root.attrib['total'])
 		for count in range (0, int(root.attrib['total'])):
-			print str(count+1)+".\t"+"Guest: "+str(root[0][0].attrib['name'])
-			print"\t"+str(root[0][0].tag)+" : "+str(root[0][0].attrib['id'])
-			id_list.append(str(root[0][0].attrib['id']))
+			print str(count+1)+".\t"+"Guest: "+str(root[0][count].attrib['name'])
+			print"\t"+str(root[0][count].tag)+" : "+str(root[0][count].attrib['id'])
+			id_list.append(str(root[0][count].attrib['id']))
 		return id_list
 
 	def guest_user_by_id(self, user, pwd, ip, id_list):
+		info_list=[]
+		file = open('ise-out.txt', 'w')
 		for resource in id_list:
 			url = "https://"+ip+":9060/ers/config/guestuser/"+resource
 			headers={
@@ -81,19 +105,15 @@ class ISE_Print:
 			print '*************'
 			print (root[3][1].tag, root[3][1].text)
 			print '*************'
-
-
 			# for child in root:
 			# 	for grand in child:
 			# 		print(grand.tag, grand.text)
 			#print
-
-			file = open('ise-out.txt', 'w')
 			file.write(''+str(root[3][4].tag)+' : '+str(root[3][4].text)+'\n')
-			file.write(''+str(root[3][5].tag)+' : '+str(root[3][5].text)+'\n\n')
-			file.write(''+str(root[3][0].tag)+' : '+str(root[3][0].text)+'\n\n')
+			file.write(''+str(root[3][5].tag)+' : '+str(root[3][5].text)+'\n')
+			file.write(''+str(root[3][0].tag)+' : '+str(root[3][0].text)+'\n')
 			file.write(''+str(root[5].tag)+' : '+str(root[5].text)+'\n')
-			file.close()
+		file.close()
 
 	def all_guest_users(self, user, pwd, ip):
 		url = "https://"+ip+":9060/ers/config/guestuser/"
@@ -121,43 +141,47 @@ class ISE_Print:
 		response = requests.request("POST", url, auth=(user,pwd), headers=headers, data=body, verify=False)
 		print response.text
 
+	def get_OS(self):
+		os_plat = platform.system()
+		return os_plat.lower()
 
+	def gen_PDF(self):
+		pdf = canvas.Canvas("printer_output.pdf", pagesize=letter)
+		pdf.drawString(72, 720, time.ctime(time.time()))
+		y=648 #36
+		file = open('ise-out.txt', 'r')
+		for line in file.readlines():
+			if line != '\n':
+				line = str(line).replace('\n','')
+				pdf.drawString(72, y, str(line))
+			#print line
+			y-=36
+		file.close
+		pdf.save()
 
-# if __name__ == '__main__':
-# 	print '\n\n\n========================================'
-# 	print '|+++\t\t\t            +++|\n|+++      ISE SOFTWARE PROJECT      +++|'
-# 	print '|+++\t\t\t            +++|'
-# 	print '========================================\n\n'
+	def print_PDF(self, printer_ip, os_plat):
+		if os_plat.lower() == 'darwin' or os_plat.lower() == 'linux':
+			IPP_addr = "https://"+printer_ip
+			printer_name = "ISE_SCRIPT_PRINTER"
+			print_name_arg = "-P"+printer_name
+			
+			call(["lpadmin", "-E", "-p", printer_name, "-v", IPP_addr, "-E"])
+			print "Initializing Printer..."
+			time.sleep(2)
+			call(["lpr", print_name_arg, 'printer_output.pdf'])
+			print "Printing..."
+			time.sleep(2)
+			call(["lpadmin", "-x", printer_name])
+			print "Tearing down connection..."
+			time.sleep(2)
 
-# 	itr = 1
-# 	all_guest_users(user, pwd, ip)
-# 	#res_list=["70ee18e0-08e3-11e7-91d1-005056aa900c"]
-# 	#guest_user_by_id(user, pwd, ip, res_list)
-	
-# 	while(1):
-# 		try:
-# 			print "Iteration: "+str(itr)
-# 			tme = chron_job()
-# 			print "chron: "+tme
-# 			res_list = recent_guests(user, pwd, ip, tme)
-# 			guest_user_by_id(user, pwd, ip, res_list)
-# 			print "\n\n\n"
-# 			if itr ==2:
-# 				new_guest(user, pwd, ip)
-# 			itr+=1
+		# elif os_plat.lower() == 'windows':
+		# 	print "Running on Windows"
+		# 	print_name_arg = "-S"+printer_name
+		# 	win32api.ShellExecute (["print https://64.102.40.215 filename"])
+		# 	win32api.ShellExecute (["lpr", print_name_arg, "-d", filename])
 
-# 		except KeyboardInterrupt:
-# 			print '\n\n\n********************************'
-# 			print '***\t\t\t     ***\n***      Session Closed      ***'
-# 			print '***\t\t\t     ***'
-# 			print '********************************\n\n'
-# 			sys.exit(0)
-		
-
-	
-	#chron_job()
-	#res_list = recent_guests(user, pwd, ip)
-	#guest_user_by_id(user, pwd, ip, res_list)
-	#all_guest_users(user, pwd, ip)
-	#new_guest(user, pwd, ip)
-
+		else:
+			print "Incompatible OS -- application designed to work with Unix based Kernels"
+			print "Exiting..."
+			#sys.exit(0)

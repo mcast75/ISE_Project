@@ -1,4 +1,5 @@
 import ISE_Print
+import sys
 
 if __name__ == '__main__':
 	print '\n\n\n========================================'
@@ -9,37 +10,35 @@ if __name__ == '__main__':
 	user = 'sponsor'
 	pwd  = 'Csap1'
 	ip="198.18.133.27"
+	printer_ip = "64.102.40.215"
 
 
 	itr = 1
+	print "OS Platform Detected: "+ISE_Print.ISE_Print().get_OS()
+	print
+	print "All Current Guests Registered: "
 	ISE_Print.ISE_Print().all_guest_users(user, pwd, ip)
-	#res_list=["70ee18e0-08e3-11e7-91d1-005056aa900c"]
-	#guest_user_by_id(user, pwd, ip, res_list)
+	
 	
 	while(1):
 		try:
 			print "Iteration: "+str(itr)
-			tme = ISE_Print.ISE_Print().chron_job()
-			print "chron: "+tme
+			chron = ISE_Print.ISE_Print().chron_job()
+			tme = ISE_Print.ISE_Print().get_convert_time(chron)
 			res_list = ISE_Print.ISE_Print().recent_guests(user, pwd, ip, tme)
-			ISE_print.guest_user_by_id(user, pwd, ip, res_list)
+			if len(res_list) > 0:
+				ISE_Print.ISE_Print().guest_user_by_id(user, pwd, ip, res_list)
+				ISE_Print.ISE_Print().gen_PDF()
+				ISE_Print.ISE_Print().print_PDF(printer_ip, ISE_Print.ISE_Print().get_OS())
 			print "\n\n\n"
-			if itr ==2:
-				ISE_Print.ISE_Print().new_guest(user, pwd, ip)
 			itr+=1
 
 		except KeyboardInterrupt:
+			print
+			ISE_Print.ISE_Print().wipe_guest(user, pwd, ip)
 			print '\n\n\n********************************'
 			print '***\t\t\t     ***\n***      Session Closed      ***'
 			print '***\t\t\t     ***'
 			print '********************************\n\n'
-			sys.exit(0)
-		
-
-	
-	#chron_job()
-	#res_list = recent_guests(user, pwd, ip)
-	#guest_user_by_id(user, pwd, ip, res_list)
-	#all_guest_users(user, pwd, ip)
-	#new_guest(user, pwd, ip)
+			sys.exit()
 
